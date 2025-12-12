@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime, timezone
-from totp_utils import generate_totp_code
+from app.totp_utils import generate_totp_code
 
 SEED_PATH = "/data/seed.txt"
 
