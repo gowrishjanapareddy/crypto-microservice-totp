@@ -1,1 +1,7 @@
-pyotp
+fastapi==0.110.0
+uvicorn==0.30.0
+cryptography==42.0.5
+python-dotenv
+pydantic
+pyotp==2.8.0
+requests

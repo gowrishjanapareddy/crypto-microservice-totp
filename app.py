@@ -1,105 +1,68 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import os
 import base64
-import time
+import pyotp
 
-from cryptography.hazmat.primitives import serialization
-from decrypt_seed import decrypt_seed
-from totp_utils import generate_totp_code, verify_totp_code
-
+from decrypt_seed import decrypt_seed  # your working RSA function
 
 app = FastAPI()
 
-SEED_PATH = "data/seed.txt"
-PRIVATE_KEY_PATH = "student_private.pem"
-
-
-# ----------- Request Models -----------
-
-class DecryptRequest(BaseModel):
+class SeedRequest(BaseModel):
     encrypted_seed: str
-
 
 class VerifyRequest(BaseModel):
     code: str
 
+def hex_to_base32(seed_hex: str) -> str:
+    seed_bytes = bytes.fromhex(seed_hex)
+    return base64.b32encode(seed_bytes).decode()
 
-# ----------- Helpers -----------
-
-def load_private_key():
-    """Load student private key from PEM file."""
-    if not os.path.exists(PRIVATE_KEY_PATH):
-        raise Exception("Private key not found")
-
-    with open(PRIVATE_KEY_PATH, "rb") as f:
-        return serialization.load_pem_private_key(f.read(), password=None)
-
-
-def read_seed():
-    """Load decrypted seed from data/seed.txt."""
-    if not os.path.exists(SEED_PATH):
-        return None
-    with open(SEED_PATH, "r") as f:
-        return f.read().strip()
-
-
-# ----------- Endpoints -----------
+@app.get("/")
+def root():
+    return {"message": "Crypto microservice is running"}
 
 @app.post("/decrypt-seed")
-def decrypt_seed_endpoint(req: DecryptRequest):
+def decrypt_seed_endpoint(req: SeedRequest):
     try:
-        private_key = load_private_key()
+        seed_hex = decrypt_seed(req.encrypted_seed)
 
-        # Base64 decode
-        encrypted_bytes = base64.b64decode(req.encrypted_seed)
-
-        # Decrypt using your function
-        hex_seed = decrypt_seed(req.encrypted_seed, private_key)
-
-        # Validate hex seed
-        if len(hex_seed) != 64 or any(c not in "0123456789abcdef" for c in hex_seed):
-            raise Exception("Invalid decrypted seed format")
-
-        # Save to /data/seed.txt
-        os.makedirs("data", exist_ok=True)
-        with open(SEED_PATH, "w") as f:
-            f.write(hex_seed)
+        # Save hex seed
+        with open("/data/seed.txt", "w") as f:
+            f.write(seed_hex)
 
         return {"status": "ok"}
 
     except Exception as e:
-        return {"error": f"Decryption failed: {str(e)}"}
-
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/generate-2fa")
 def generate_2fa():
-    seed = read_seed()
-    if not seed:
-        raise HTTPException(status_code=500, detail="Seed not decrypted yet")
+    try:
+        with open("/data/seed.txt", "r") as f:
+            seed_hex = f.read().strip()
 
-    # Generate code
-    code = generate_totp_code(seed)
+        seed_b32 = hex_to_base32(seed_hex)
+        totp = pyotp.TOTP(seed_b32)
+        code = totp.now()
 
-    # Remaining seconds in this TOTP period
-    now = int(time.time())
-    valid_for = 30 - (now % 30)
+        return {"code": code}
 
-    return {
-        "code": code,
-        "valid_for": valid_for
-    }
-
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/verify-2fa")
 def verify_2fa(req: VerifyRequest):
-    if not req.code:
-        raise HTTPException(status_code=400, detail="Missing code")
+    try:
+        with open("/data/seed.txt", "r") as f:
+            seed_hex = f.read().strip()
 
-    seed = read_seed()
-    if not seed:
-        raise HTTPException(status_code=500, detail="Seed not decrypted yet")
+        seed_b32 = hex_to_base32(seed_hex)
+        totp = pyotp.TOTP(seed_b32)
 
-    is_valid = verify_totp_code(seed, req.code, valid_window=1)
+        if totp.verify(req.code):
+            return {"status": "valid"}
 
-    return {"valid": is_valid}
+        return {"status": "invalid"}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
