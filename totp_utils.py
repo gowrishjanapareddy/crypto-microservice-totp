@@ -1,21 +1,13 @@
-import os
+# totp_utils.py
 import base64
 import pyotp
 
 SEED_FILE = "/data/seed.txt"
 
-def load_seed_hex():
-    if not os.path.exists(SEED_FILE):
-        return None
+def generate_totp_code() -> str:
     with open(SEED_FILE, "r") as f:
-        return f.read().strip()
+        seed_hex = f.read().strip()
 
-def generate_totp_code():
-    seed_hex = load_seed_hex()
-    if not seed_hex:
-        raise Exception("Seed not found")
-
-    # Convert hex → bytes → base32
     seed_bytes = bytes.fromhex(seed_hex)
     base32_seed = base64.b32encode(seed_bytes).decode("utf-8")
 

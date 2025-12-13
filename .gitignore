@@ -1,10 +1,26 @@
-# Python cache
+# =========================
+# Sensitive runtime files
+# =========================
+
+# Encrypted seed (must NOT be committed)
+encrypted_seed.txt
+
+# =========================
+# Python artifacts
+# =========================
 __pycache__/
 *.pyc
+*.pyo
 
-# Environment files
+# =========================
+# Environment & IDE
+# =========================
 .env
-
-# IDE files
 .vscode/
 .idea/
+
+# =========================
+# OS noise
+# =========================
+.DS_Store
+Thumbs.db

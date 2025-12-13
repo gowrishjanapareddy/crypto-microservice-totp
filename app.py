@@ -66,3 +66,6 @@ def verify_2fa(req: VerifyRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+@app.get("/health")
+def health():
+    return {"status": "ok"}

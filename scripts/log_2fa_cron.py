@@ -1,29 +1,20 @@
-#!/usr/bin/env python3
-
-import os
+# scripts/log_2fa_cron.py
 from datetime import datetime, timezone
-from app.totp_utils import generate_totp_code
+from totp_utils import generate_totp_code
+import os
 
-SEED_PATH = "/data/seed.txt"
-
-def read_seed():
-    try:
-        with open(SEED_PATH, "r") as f:
-            return f.read().strip()
-    except FileNotFoundError:
-        print("Seed file not found")
-        return None
+SEED_FILE = "/data/seed.txt"
 
 def main():
-    seed = read_seed()
-    if not seed:
-        print("No seed available for cron job")
-        return
+    if not os.path.exists(SEED_FILE):
+        return  # seed not ready yet, silently skip
 
-    code = generate_totp_code(seed)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-
-    print(f"{timestamp} - 2FA Code: {code}")
+    try:
+        code = generate_totp_code()
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+        print(f"{ts} 2FA={code}")
+    except Exception as e:
+        print(f"ERROR: {e}")
 
 if __name__ == "__main__":
     main()
